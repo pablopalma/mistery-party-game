@@ -242,6 +242,133 @@
       </div>`;
   }
 
+  function listNames(names) {
+    return names.length > 1 ? names.slice(0, -1).join(', ') + ' y ' + names[names.length - 1] : names[0];
+  }
+
+  // Mini guion del modo culpable: frases para arrancar cada ronda, armadas con los datos del caso.
+  // "say" son líneas para decir tal cual; "tip" son consejos que no se leen en voz alta.
+  function script() {
+    const part = game.parts[ui.role];
+    const crime = placeName(game.crimePlace);
+    if (ui.role === 0) {
+      const a = person(game.players[1]).name;
+      const b = person(game.players[2]).name;
+      const known = [];
+      game.clues[0].forEach((c) => [c.x, c.x2].forEach((x) => {
+        if (x !== undefined && known.indexOf(person(x).name) < 0) known.push(person(x).name);
+      }));
+      return [
+        { title: '1. Abrir el caso', say: [
+          `Anoche desapareció ${game.loot}. Estaba en ${crime}.`,
+          `${a}, ${b}: uno de ustedes dos pasó la noche ahí. De acá no se va nadie hasta que yo sepa quién.`,
+          'Preséntense. Quiero saber con quién estoy hablando.'
+        ] },
+        { title: '2. Coartadas (a cada uno, por separado)', say: [
+          '¿Dónde pasaste la noche? ¿Entraste en algún otro lugar?',
+          '¿Qué objeto llevabas? ¿Para qué lo querías?',
+          '¿Qué estabas haciendo exactamente? ¿Alguien puede confirmarlo?',
+          `Todos comentan algo de vos, ${a}: «${game.parts[1].motive}» ¿Qué tenés para decir?`,
+          `Y de vos, ${b}, se dice esto: «${game.parts[2].motive}» Explicate.`
+        ], tip: 'Anotá el lugar y el objeto que dice cada uno. El culpable miente justo ahí.' },
+        { title: '3. Testimonios', say: [
+          'Contame qué viste esa noche. De a una cosa por vez.',
+          'Repetímelo, palabra por palabra.',
+          '¿Eso lo viste vos, o te lo contaron?',
+          `¿Y vos qué opinás de lo que acaba de decir ${b}?`
+        ], tip: `Tu evidencia habla de ${listNames(known)}. Preguntales por esas personas sin avisar que ya sabés algo, y fijate quién dice algo que no encaja. Pedir que repitan una pista más tarde sirve: al que la inventó le cuesta decirla igual.` },
+        { title: '4. Careo', say: [
+          `${a}, mirá a ${b} a los ojos y decile en qué miente.`,
+          'Si vos sos inocente, entonces el otro miente. ¿En qué, exactamente?',
+          '¿Cuál de tus pistas hunde la historia del otro? ¿Por qué?',
+          'Uso una orden de registro. Mostrame en pantalla la pista que dice que…'
+        ], tip: 'Cómo gastar las órdenes: buscá una pista que, de ser verdadera, vuelva imposible lo que dice el otro, y exigí verla. Si te la muestran, ya sabés quién miente. Desconfiá del que te ofrece mostrar una pista que no le pediste: puede querer que gastes la orden.' },
+        { title: '5. Veredicto', say: [
+          'Ya escuché suficiente. Última oportunidad: ¿alguien quiere cambiar su declaración?',
+          'Uno de ustedes me mintió desde el principio. Y fue…'
+        ] }
+      ];
+    }
+
+    const me = person(game.players[ui.role]);
+    const otherRole = 3 - ui.role;
+    const other = person(game.players[otherRole]).name;
+    const otherMotive = game.parts[otherRole].motive;
+    const sees = ui.role === 1 ? 'qué objeto había en cada lugar' : 'qué objeto llevaba cada persona';
+    const intro = { title: '1. Presentarte', say: [
+      `Soy ${me.name}, ${me.role}. Y no pienso quedarme mucho tiempo.`,
+      `${part.persona.tic} Yo no tengo nada que ver con esto.`
+    ], tip: 'Hablá siempre como tu personaje. Usá la muletilla.' };
+
+    if (isGuilty()) {
+      const s = game.story;
+      const realOne = s.hand.find((h) => h.real);
+      const npc = game.cast.people.filter((p, i) => game.players.indexOf(i) < 0)[0];
+      return [
+        intro,
+        { title: '2. Tu coartada', say: [
+          `Estuve en ${placeName(s.place)} toda la noche. No me moví de ahí.`,
+          `Llevaba ${objName(s.obj)}. ¿Qué tiene de raro?`,
+          'Lo que hacía ahí… prefiero no decirlo. Bueno, está bien, lo digo, pero no se rían.',
+          'Sí, eso que dicen de mí es cierto. Pero una cosa es tener problemas y otra es robar.'
+        ], tip: `Contá que estabas ${part.doing}. Confesar algo vergonzoso hace creíble el resto. Decí siempre el mismo lugar y el mismo objeto: no los cambies nunca.` },
+        { title: '3. Tu testimonio', say: [
+          `Yo vi ${sees}. Y lo que vi no deja bien parado a ${other}.`,
+          realOne ? `Te lo puedo probar: ${E.describe(realOne.c, game.cast)} Pedime que te lo muestre.` : 'Lo vi con mis propios ojos.'
+        ], tip: 'Empezá por las pistas verdaderas y ofrecé mostrarlas: ganás confianza y, con suerte, el detective gasta una orden en vos. La inventada decila al pasar, con las mismas palabras cada vez.' },
+        { title: '4. Atacar y defenderte', say: [
+          `Preguntale a ${other} por lo que todos saben: «${otherMotive}»`,
+          `¿Por qué ${other} no quiere contar qué estaba haciendo? Yo ya lo dije.`,
+          `¿Vas a creerle a ${other}? Mirá cómo transpira.`,
+          'Yo colaboré desde el primer minuto. ¿Quién es el que se pone nervioso acá?'
+        ], tip: 'Tu mejor defensa es que el detective dude del otro. Acusá primero.' },
+        { title: '5. Si te exigen mostrar la pista inventada', say: [
+          `Esa no la vi yo: me la contó ${npc.name}. Pero es cierta.`,
+          '¿Otra vez? Ya te mostré una. ¿Y al otro no le pedís nada?',
+          'Se me debe haber mezclado. Lo importante es dónde estaba cada uno.'
+        ], tip: 'Si no hay salida, admití un error chico («me confundí con otra cosa») antes que quedarte en silencio.' }
+      ];
+    }
+
+    return [
+      intro,
+      { title: '2. Tu coartada', say: [
+        `Estuve en ${placeName(game.sol[0][game.players[ui.role]])} toda la noche. No me moví de ahí.`,
+        `Llevaba ${objName(game.sol[2][game.players[ui.role]])}. Lo puede confirmar cualquiera.`,
+        'Lo que hacía ahí es asunto mío y no tiene nada que ver con el robo.',
+        'Sí, eso que dicen de mí es cierto. Pero una cosa es tener problemas y otra es robar.'
+      ], tip: `Estabas ${part.doing}. Podés esquivarlo o inventar otra cosa, pero ojo: si te ven dudar, vas a parecer culpable. A veces conviene confesarlo y listo.` },
+      { title: '3. Tu testimonio', say: [
+        `Yo vi ${sees}. Anotá bien, porque todo esto es verdad.`,
+        'Lo vi con mis propios ojos. Pedime que te lo muestre cuando quieras.',
+        'No tengo nada que esconder: usá una orden conmigo.'
+      ], tip: 'Contá tus pistas de a una y siempre con las mismas palabras. Todas las tuyas se pueden mostrar en pantalla: esa es tu ventaja.' },
+      { title: '4. Atacar y defenderte', say: [
+        `${other} miente. Preguntale otra vez dónde estuvo y con qué objeto.`,
+        `Pedile a ${other} que te muestre en pantalla lo que acaba de decir. A ver si puede.`,
+        `Lo que dice ${other} no puede ser, porque yo vi otra cosa.`,
+        `Y no nos olvidemos de lo que todos saben: «${otherMotive}»`
+      ], tip: `Vos sabés que ${other} es culpable, así que algo de lo que dice es falso. Escuchá su coartada y buscá cuál de tus pistas la contradice: esa es la que tenés que lograr que el detective verifique.` },
+      { title: '5. Antes del veredicto', say: [
+        'Detective, repasá: ¿quién te mostró todo lo que le pediste y quién puso excusas?',
+        `Yo dije lo mismo de principio a fin. ¿${other} también?`
+      ] }
+    ];
+  }
+
+  function viewScript() {
+    if (!game.versus) return '';
+    const blocks = script().map((b) => `
+      <h3>${b.title}</h3>
+      ${b.say.map((line) => `<p class="say">«${line}»</p>`).join('')}
+      ${b.tip ? `<p class="tip">💡 ${b.tip}</p>` : ''}`).join('');
+    return `<details class="card guide script">
+      <summary>Tu guion</summary>
+      <p class="muted small">Frases para arrancar cada ronda. Usalas tal cual o como punto de partida, con la voz de tu personaje.</p>
+      ${blocks}
+    </details>`;
+  }
+
   function viewPapel() {
     const part = game.parts[ui.role];
     const info = roleInfo(ui.role);
@@ -289,6 +416,7 @@
         <p class="tic">Tu muletilla: «${part.persona.tic}»</p>
       </div>
       ${secret}
+      ${viewScript()}
       <div class="card">
         <h3 style="margin-top:0">Misión secreta</h3>
         <p>${part.mission}</p>

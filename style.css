@@ -239,6 +239,15 @@ button.chip.on { background: var(--accent); color: var(--accent-ink); border-col
 .guide summary { font-family: Georgia, serif; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
 .guide[open] summary { margin-bottom: 10px; }
 
+.script .say {
+  font-family: Georgia, serif;
+  font-style: italic;
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+  margin-bottom: 8px;
+}
+.script .tip { font-size: .875rem; color: var(--muted); background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+
 .persona .tic { color: var(--accent); font-family: Georgia, serif; font-style: italic; margin: 0; }
 .verdict.good { border-color: var(--good); }
 .verdict.bad { border-color: var(--bad); }
