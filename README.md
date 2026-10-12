@@ -1,6 +1,8 @@
 # Tres Sabuesos 🔎
 
-Juego de misterio, deducción y un poco de teatro para exactamente 3 personas. Cada una entra al mismo caso desde su celular y ve información que las otras no.
+Expedientes de homicidio para exactamente 3 personas: deducción, interrogatorio y bastante teatro. Cada una entra al mismo caso desde su celular y ve información que las otras no.
+
+Cada caso se arma con un escenario cerrado (una casona, una cabaña en la nieve, un edificio a oscuras, unas oficinas, un hotel de ruta o un teatro), una víctima con su historia, sospechosos con nacionalidad, acento, carácter y trasfondo, y un conjunto de objetos entre los que está el arma.
 
 ## Modos
 
@@ -22,7 +24,9 @@ Los tres investigan juntos. Detective, Forense y Periodista tienen pistas distin
 
 ## En los dos modos
 
-- Cada jugador recibe un **personaje** con forma de hablar y muletilla, y una **misión secreta** para actuar.
+- Cada jugador recibe una **ficha personal**: origen y acento para imitar, carácter, muletilla y trasfondo.
+- **Tu guion** trae frases para cada ronda, armadas con los datos del caso.
+- Cada jugador tiene una **misión secreta** de actuación.
 - La pestaña **Caso** trae una guía ronda por ronda.
 - Prohibido mostrar la pantalla, salvo cuando el juego lo pide.
 - Con un solo celular también funciona: se pasa de mano en mano con «Cambiar papel».

@@ -87,7 +87,7 @@
     if (!game.versus) return { icon: base.icon, name: base.name, about: base.about, deck: base.deck };
     if (r === 0) return { icon: '🕵️', name: 'Detective', about: 'Interrogás a los dos sospechosos y decidís a quién acusar.', deck: 'Tu evidencia' };
     const p = person(game.players[r]);
-    return { icon: p.icon, name: p.name, about: 'Sospechoso: ' + p.role + '. Puede tocarte ser inocente o culpable.', deck: 'Lo que viste' };
+    return { icon: p.icon, name: p.name + ' ' + p.last, about: E.cap(p.role) + '. ' + E.cap(p.origin) + '. Puede tocarte ser inocente o culpable.', deck: 'Lo que viste' };
   }
 
   function isGuilty() {
@@ -128,22 +128,22 @@
     }).join('');
     return `
       <div class="hero">
-        <div class="logo">🔎</div>
+        <div class="stamp red">Homicidios</div>
         <h1>Tres Sabuesos</h1>
-        <p>Misterio, deducción y un poco de teatro para exactamente 3.</p>
+        <p>Expedientes de homicidio para exactamente 3 personas.</p>
       </div>
       <div class="card">
-        <h2>Nuevo caso</h2>
+        <h2>Abrir expediente</h2>
         <div class="modes">
           <button class="mode ${ui.versus ? 'on' : ''}" data-act="mode" data-v="1">
             <b>🎭 Culpable entre nosotros</b>
-            <span>1 detective y 2 sospechosos. Uno miente para salvarse.</span></button>
+            <span>1 detective y 2 sospechosos. Uno mató y miente para salvarse.</span></button>
           <button class="mode ${ui.versus ? '' : 'on'}" data-act="mode" data-v="">
             <b>🤝 En equipo</b>
             <span>Los tres investigan juntos, cada uno con pistas distintas.</span></button>
         </div>
         <div class="levels">${levels}</div>
-        <button class="btn primary" data-act="create">Crear caso</button>
+        <button class="btn primary" data-act="create">Abrir caso nuevo</button>
       </div>
       <div class="card">
         <h2>Unirse a un caso</h2>
@@ -186,58 +186,77 @@
 
   function guide() {
     const steps = game.versus ? [
-      ['Presentación', 'El detective cuenta el caso en voz alta. Cada sospechoso se presenta en personaje, con su forma de hablar.'],
-      ['Coartadas', 'El detective pregunta a cada sospechoso dónde pasó la noche, qué objeto llevaba y qué estaba haciendo.'],
+      ['Presentación', 'El detective lee el expediente en voz alta. Cada sospechoso se presenta en personaje, con su acento y su muletilla.'],
+      ['Coartadas', 'El detective pregunta a cada sospechoso dónde estaba a la hora del crimen, qué objeto tenía y qué estaba haciendo.'],
       ['Testimonios', 'Por turnos, cada sospechoso cuenta lo que vio, una pista por vez. El detective anota y compara con su evidencia, que no está obligado a revelar.'],
       ['Careo', `Los sospechosos se acusan y se defienden. El detective repregunta y puede usar sus ${ORDERS} órdenes de registro: exige que le muestren en pantalla una pista que le dijeron. Una pista inventada no se puede mostrar.`],
-      ['Veredicto', 'El detective acusa a uno. Si acierta, ganan el detective y el inocente. Si se equivoca, el culpable se salva y gana.']
+      ['Veredicto', 'El detective acusa a uno. Si acierta, ganan el detective y el inocente. Si se equivoca, el asesino queda libre y gana.']
     ] : [
-      ['Presentación', 'Cada investigador se presenta en personaje, con su forma de hablar.'],
+      ['Presentación', 'Cada investigador se presenta en personaje, con su acento y su muletilla.'],
       ['Declaraciones', 'Por turnos, cada uno lee sus pistas en voz alta. Los demás anotan.'],
-      ['Careo', 'Crucen datos y discutan hasta saber quién estuvo dónde y con qué objeto.'],
+      ['Careo', 'Crucen datos y discutan hasta saber quién estuvo dónde y con qué objeto. Hay que dar con el asesino y con el arma.'],
       ['Acusación', 'Voten a la cuenta de tres. Una sola persona carga la acusación. Hay 2 intentos.']
     ];
     return `<details class="card guide" ${save.tries || save.done.length ? '' : 'open'}>
-      <summary>Guía de la partida</summary>
+      <summary>Procedimiento</summary>
       <ol class="steps">${steps.map((s) => `<li><b>${s[0]}.</b> ${s[1]}</li>`).join('')}</ol>
     </details>`;
   }
 
+  function fileNo() {
+    return ui.code.slice(-4) + '/' + game.file.year;
+  }
+
   function viewCaso() {
     const c = game.cast;
+    const f = game.file;
     const chips = (list, fmt) => `<div class="chips">${list.map((x, i) => `<span class="chip">${fmt(x, i)}</span>`).join('')}</div>`;
-    const spot = `<b>${c.places[game.crimePlace].name}</b> ${c.places[game.crimePlace].icon}`;
-    let scene;
+    const spot = c.places[game.crimePlace];
     let people;
     if (game.versus) {
       const sus = [1, 2].map((r) => {
         const p = person(game.players[r]);
-        return `<li><b>${p.icon} ${p.name}</b>, ${p.role}. <span class="muted">${game.parts[r].motive}</span></li>`;
+        return `<li><b>${p.icon} ${p.name} ${p.last}</b>, ${p.role}. ${E.cap(p.origin)}.<br><span class="muted">Móvil: ${game.parts[r].motive}</span></li>`;
       }).join('');
       const rest = c.people.filter((p, i) => game.players.indexOf(i) < 0);
-      scene = `Anoche desapareció <b>${game.loot}</b>. Estaba en ${spot}. Hay dos sospechosos, y uno de los dos pasó la noche allí.`;
       people = `<h3>Sospechosos</h3><ul class="steps">${sus}</ul>
-        <h3>También estaban en la casa</h3>
-        ${chips(rest, (p) => `${p.icon} ${p.name}, ${p.role}`)}
-        <p class="muted small" style="margin-top:6px">No están bajo sospecha, pero ocuparon un lugar y llevaban un objeto.</p>`;
+        <h3>También estaban en el lugar</h3>
+        ${chips(rest, (p) => `${p.icon} ${p.name} ${p.last}, ${p.role}`)}
+        <p class="muted small" style="margin-top:6px">Descartados como autores, pero cada uno ocupó un lugar y tuvo un objeto.</p>`;
     } else {
-      scene = `Anoche desapareció <b>${game.loot}</b>. Estaba en ${spot}. Quien pasó la noche allí es culpable.`;
-      people = `<h3>Sospechosos</h3>${chips(c.people, (p) => `${p.icon} ${p.name}, ${p.role}`)}`;
+      people = `<h3>Sospechosos</h3>${chips(c.people, (p) => `${p.icon} ${p.name} ${p.last}, ${p.role}`)}`;
     }
     return `
+      <div class="card file">
+        <div class="stamp red">Confidencial</div>
+        <p class="file-no">Expediente N.º ${fileNo()}</p>
+        <p class="file-title">Homicidio</p>
+        <table class="facts">
+          <tr><th>Fecha</th><td>${f.date}</td></tr>
+          <tr><th>Lugar</th><td>${game.scenario.icon} ${game.scenario.name}</td></tr>
+          <tr><th>Víctima</th><td>${game.victim.name}</td></tr>
+          <tr><th>Hallazgo</th><td>${spot.icon} ${E.cap(spot.name)}</td></tr>
+          <tr><th>Hora de muerte</th><td>entre las ${f.from} y las ${f.to}</td></tr>
+          <tr><th>Arma</th><td>sin determinar</td></tr>
+        </table>
+        <p class="scene">${game.scenario.intro}</p>
+        <p>${game.victim.bio}</p>
+        <p>El cuerpo apareció en <b>${spot.name}</b>. ${game.versus
+          ? 'Hay dos sospechosos, y uno de los dos pasó allí la hora del crimen.'
+          : 'Quien pasó allí la hora del crimen es el asesino, y el objeto que tenía es el arma.'}</p>
+      </div>
       ${guide()}
       <div class="card">
-        <p class="scene">${scene}</p>
-        <h3>Lo que saben todos</h3>
+        <h3 style="margin-top:0">Hechos comprobados</h3>
         <ul class="steps">
-          <li>Cada persona pasó la noche en un lugar distinto.</li>
-          <li>Cada persona llevaba un objeto distinto.</li>
-          <li>${game.versus ? 'El inocente no miente sobre dónde estuvo, qué llevaba ni qué vio. El culpable puede mentir en todo.' : 'Todas las pistas son verdaderas.'}</li>
+          <li>Entre las ${f.from} y las ${f.to}, cada persona estuvo en un lugar distinto y no se movió de ahí.</li>
+          <li>Cada persona tuvo en su poder un objeto distinto. Uno de ellos es el arma.</li>
+          <li>${game.versus ? 'El inocente no miente sobre dónde estuvo, qué tenía ni qué vio. El asesino puede mentir en todo.' : 'Todas las pistas son verdaderas.'}</li>
         </ul>
         ${people}
         <h3>Lugares</h3>
-        ${chips(c.places, (p) => `${p.icon} ${E.cap(p.name)}`)}
-        <h3>Objetos</h3>
+        ${chips(c.places, (x) => `${x.icon} ${E.cap(x.name)}`)}
+        <h3>Objetos secuestrados</h3>
         ${chips(c.objects, (o) => `${o.icon} ${E.cap(o.name)}`)}
       </div>`;
   }
@@ -246,11 +265,41 @@
     return names.length > 1 ? names.slice(0, -1).join(', ') + ' y ' + names[names.length - 1] : names[0];
   }
 
-  // Mini guion del modo culpable: frases para arrancar cada ronda, armadas con los datos del caso.
+  // Mini guion: frases para arrancar cada ronda, armadas con los datos del caso.
   // "say" son líneas para decir tal cual; "tip" son consejos que no se leen en voz alta.
   function script() {
     const part = game.parts[ui.role];
     const crime = placeName(game.crimePlace);
+    const victim = game.victim.name;
+    const f = game.file;
+
+    if (!game.versus) {
+      return [
+        { title: '1. Presentarte', say: [
+          `${part.persona.name}. Me mandaron porque este caso no lo quiere nadie.`,
+          `${part.persona.tic} A ${victim} no le llegó la muerte por casualidad.`,
+          'No vine a hacer amigos. Vine a cerrar un expediente.'
+        ] },
+        { title: '2. Declarar lo tuyo', say: [
+          'Esto es lo que encontré. Anoten, que no lo repito.',
+          'De esto estoy seguro. Lo demás son suposiciones.',
+          '¿Alguien tiene algo que contradiga lo que acabo de decir?'
+        ] },
+        { title: '3. Cruzar datos', say: [
+          'Eso no encaja con lo mío. Repetilo despacio.',
+          'Si esa persona estuvo ahí, entonces no pudo estar acá. ¿Estamos de acuerdo?',
+          'Recapitulemos. ¿Qué sabemos con certeza y qué estamos suponiendo?',
+          'Nos falta un dato. ¿Quién tiene algo sobre esa persona?',
+          'Descartemos primero a quienes seguro no fueron.'
+        ], tip: 'Cada vez que confirman algo, relean las pistas: una que antes no servía ahora puede cerrar otra casilla.' },
+        { title: '4. Acusar', say: [
+          'A la cuenta de tres, cada uno dice un nombre.',
+          'Antes de acusar: ¿alguien tiene una sola duda? Hablen ahora.',
+          `El asesino de ${victim} es…`
+        ] }
+      ];
+    }
+
     if (ui.role === 0) {
       const a = person(game.players[1]).name;
       const b = person(game.players[2]).name;
@@ -260,111 +309,162 @@
       }));
       return [
         { title: '1. Abrir el caso', say: [
-          `Anoche desapareció ${game.loot}. Estaba en ${crime}.`,
-          `${a}, ${b}: uno de ustedes dos pasó la noche ahí. De acá no se va nadie hasta que yo sepa quién.`,
-          'Preséntense. Quiero saber con quién estoy hablando.'
+          `Expediente ${fileNo()}. ${E.cap(f.date)}. ${game.scenario.name}.`,
+          `Esta noche mataron a ${victim}. El cuerpo apareció en ${crime}. Murió entre las ${f.from} y las ${f.to}.`,
+          `${a}, ${b}: uno de ustedes dos estuvo ahí a esa hora. De acá no se va nadie hasta que yo sepa quién.`,
+          'Preséntense. Nombre, de dónde vienen y qué eran de la víctima.'
         ] },
-        { title: '2. Coartadas (a cada uno, por separado)', say: [
-          '¿Dónde pasaste la noche? ¿Entraste en algún otro lugar?',
-          '¿Qué objeto llevabas? ¿Para qué lo querías?',
+        { title: '2. Romper el hielo', say: [
+          `¿Cuándo fue la última vez que viste a ${victim} con vida?`,
+          '¿Cómo te llevabas con la víctima? La verdad, no la versión para el velorio.',
+          'Describime a la víctima en tres palabras.',
+          '¿Quién de los que estaban esta noche ganaba algo con esta muerte?',
+          '¿Te sorprendió? No parecés una persona sorprendida.'
+        ], tip: 'Estas preguntas no resuelven el caso, pero hacen hablar. Quien inventa suele dar demasiados detalles, o ninguno.' },
+        { title: '3. Coartadas (a cada uno, por separado)', say: [
+          `Entre las ${f.from} y las ${f.to}, ¿dónde estabas? ¿Entraste en algún otro lugar?`,
+          '¿Qué tenías en la mano? ¿De dónde lo sacaste y para qué lo querías?',
           '¿Qué estabas haciendo exactamente? ¿Alguien puede confirmarlo?',
-          `Todos comentan algo de vos, ${a}: «${game.parts[1].motive}» ¿Qué tenés para decir?`,
+          '¿Escuchaste algo? ¿Un grito, un golpe, pasos?',
+          `Hay algo que todos comentan de vos, ${a}: «${game.parts[1].motive}» ¿Qué tenés para decir?`,
           `Y de vos, ${b}, se dice esto: «${game.parts[2].motive}» Explicate.`
-        ], tip: 'Anotá el lugar y el objeto que dice cada uno. El culpable miente justo ahí.' },
-        { title: '3. Testimonios', say: [
+        ], tip: 'Anotá el lugar y el objeto que dice cada uno. El asesino miente justo ahí.' },
+        { title: '4. Testimonios', say: [
           'Contame qué viste esa noche. De a una cosa por vez.',
           'Repetímelo, palabra por palabra.',
           '¿Eso lo viste vos, o te lo contaron?',
+          '¿Quién más andaba por ahí? ¿Con qué?',
           `¿Y vos qué opinás de lo que acaba de decir ${b}?`
-        ], tip: `Tu evidencia habla de ${listNames(known)}. Preguntales por esas personas sin avisar que ya sabés algo, y fijate quién dice algo que no encaja. Pedir que repitan una pista más tarde sirve: al que la inventó le cuesta decirla igual.` },
-        { title: '4. Careo', say: [
+        ], tip: `Tu evidencia habla de ${listNames(known)}. Preguntales por esas personas sin avisar que ya sabés algo, y fijate quién dice algo que no encaja. Pedir que repitan una pista más tarde sirve: a quien la inventó le cuesta decirla igual.` },
+        { title: '5. Preguntas trampa', say: [
+          'Hace un rato dijiste otra cosa. ¿Cuál de las dos es la verdad?',
+          'Ya sé más de lo que creés. ¿Querés agregar algo antes de que lo diga yo?',
+          'Supongamos que no fuiste vos. Entonces contame cómo lo hizo el otro, paso a paso.',
+          '¿A qué hora dijiste que…? No, dejá. ¿Dónde era que estabas?',
+          'Si te pido que me muestres eso en pantalla ahora mismo, ¿podés?'
+        ], tip: 'Vos sí podés mentir y hacer de cuenta que sabés más. Amenazar con una orden de registro sin gastarla también da información: mirá quién se pone nervioso.' },
+        { title: '6. Careo', say: [
           `${a}, mirá a ${b} a los ojos y decile en qué miente.`,
-          'Si vos sos inocente, entonces el otro miente. ¿En qué, exactamente?',
+          'Si vos sos inocente, entonces el otro mató. ¿En qué miente, exactamente?',
           '¿Cuál de tus pistas hunde la historia del otro? ¿Por qué?',
+          'Los dos no pueden tener razón. Alguien acá es un asesino.',
           'Uso una orden de registro. Mostrame en pantalla la pista que dice que…'
-        ], tip: 'Cómo gastar las órdenes: buscá una pista que, de ser verdadera, vuelva imposible lo que dice el otro, y exigí verla. Si te la muestran, ya sabés quién miente. Desconfiá del que te ofrece mostrar una pista que no le pediste: puede querer que gastes la orden.' },
-        { title: '5. Veredicto', say: [
+        ], tip: 'Cómo gastar las órdenes: buscá una pista que, de ser verdadera, vuelva imposible lo que dice el otro, y exigí verla. Si te la muestran, ya sabés quién miente. Desconfiá de quien te ofrece mostrar una pista que no pediste: puede querer que gastes la orden.' },
+        { title: '7. Veredicto', say: [
           'Ya escuché suficiente. Última oportunidad: ¿alguien quiere cambiar su declaración?',
+          `Voy a contar lo que pasó esa noche. Entre las ${f.from} y las ${f.to}, alguien entró en ${crime}…`,
           'Uno de ustedes me mintió desde el principio. Y fue…'
-        ] }
+        ], tip: 'Antes de acusar, reconstruí el crimen en voz alta: si alguno te corrige un detalle que no debería conocer, ahí lo tenés.' }
       ];
     }
 
-    const me = person(game.players[ui.role]);
+    const meIdx = game.players[ui.role];
+    const me = person(meIdx);
     const otherRole = 3 - ui.role;
     const other = person(game.players[otherRole]).name;
     const otherMotive = game.parts[otherRole].motive;
-    const sees = ui.role === 1 ? 'qué objeto había en cada lugar' : 'qué objeto llevaba cada persona';
+    const sees = ui.role === 1 ? 'qué objeto había en cada lugar' : 'qué objeto tenía cada persona';
     const intro = { title: '1. Presentarte', say: [
-      `Soy ${me.name}, ${me.role}. Y no pienso quedarme mucho tiempo.`,
-      `${part.persona.tic} Yo no tengo nada que ver con esto.`
-    ], tip: 'Hablá siempre como tu personaje. Usá la muletilla.' };
+      `${me.name} ${me.last}, ${me.role}.`,
+      `${me.tic} Yo no tengo nada que ver con esto.`,
+      'No pienso quedarme mucho tiempo, así que pregunte rápido.'
+    ], tip: 'Hablá siempre como tu personaje: acento, muletilla y carácter. Usá tu trasfondo si te preguntan por tu vida.' };
+    const aboutVictim = { title: '2. Sobre la víctima', say: [
+      `${victim} tenía enemigos por todos lados. Yo era de las pocas personas que todavía le hablaban.`,
+      'No voy a fingir que lloro. Pero de ahí a matar hay un abismo.',
+      'La última vez que hablamos tenía miedo. Miraba la puerta todo el tiempo.',
+      'Si quiere saber quién ganaba con esto, mire para otro lado.'
+    ] };
+    const aboutMotive = { title: '4. Cuando te tiren tu móvil en la cara', say: [
+      'Es cierto. ¿Y? Con ese criterio media ciudad tenía motivos.',
+      'Justamente por eso habría que ser idiota para hacerlo: soy el primer sospechoso.',
+      'Eso es un chisme viejo. Y quien lo repite sabrá por qué lo repite.',
+      'Una cosa es tener problemas con alguien y otra muy distinta es matar.'
+    ], tip: `Lo que todos saben de vos: «${part.motive}» Tené una respuesta lista.` };
 
     if (isGuilty()) {
-      const s = game.story;
-      const realOne = s.hand.find((h) => h.real);
+      const st = game.story;
+      const realOne = st.hand.find((h) => h.real);
       const npc = game.cast.people.filter((p, i) => game.players.indexOf(i) < 0)[0];
       return [
         intro,
-        { title: '2. Tu coartada', say: [
-          `Estuve en ${placeName(s.place)} toda la noche. No me moví de ahí.`,
-          `Llevaba ${objName(s.obj)}. ¿Qué tiene de raro?`,
-          'Lo que hacía ahí… prefiero no decirlo. Bueno, está bien, lo digo, pero no se rían.',
-          'Sí, eso que dicen de mí es cierto. Pero una cosa es tener problemas y otra es robar.'
-        ], tip: `Contá que estabas ${part.doing}. Confesar algo vergonzoso hace creíble el resto. Decí siempre el mismo lugar y el mismo objeto: no los cambies nunca.` },
-        { title: '3. Tu testimonio', say: [
+        aboutVictim,
+        { title: '3. Tu coartada', say: [
+          `A esa hora estaba en ${placeName(st.place)}. No me moví de ahí.`,
+          `Tenía ${objName(st.obj)}. ¿Qué tiene de raro? Estaba ahí.`,
+          'Lo que hacía… prefiero no decirlo. Está bien, lo digo, pero que no salga de acá.',
+          'No escuché nada. Y si hubiera escuchado, habría ido a ver.'
+        ], tip: `Contá que estabas ${part.doing}. Confesar algo turbio hace creíble el resto. Decí siempre el mismo lugar y el mismo objeto: no los cambies nunca.` },
+        aboutMotive,
+        { title: '5. Tu testimonio', say: [
           `Yo vi ${sees}. Y lo que vi no deja bien parado a ${other}.`,
-          realOne ? `Te lo puedo probar: ${E.describe(realOne.c, game.cast)} Pedime que te lo muestre.` : 'Lo vi con mis propios ojos.'
+          realOne ? `Te lo puedo probar: ${E.describe(realOne.c, game.cast)} Pedime que te lo muestre.` : 'Lo vi con mis propios ojos.',
+          'Anotá bien, porque después no quiero que digan que cambié la versión.'
         ], tip: 'Empezá por las pistas verdaderas y ofrecé mostrarlas: ganás confianza y, con suerte, el detective gasta una orden en vos. La inventada decila al pasar, con las mismas palabras cada vez.' },
-        { title: '4. Atacar y defenderte', say: [
+        { title: '6. Atacar', say: [
           `Preguntale a ${other} por lo que todos saben: «${otherMotive}»`,
           `¿Por qué ${other} no quiere contar qué estaba haciendo? Yo ya lo dije.`,
           `¿Vas a creerle a ${other}? Mirá cómo transpira.`,
-          'Yo colaboré desde el primer minuto. ¿Quién es el que se pone nervioso acá?'
-        ], tip: 'Tu mejor defensa es que el detective dude del otro. Acusá primero.' },
-        { title: '5. Si te exigen mostrar la pista inventada', say: [
+          'Yo colaboré desde el primer minuto. ¿Quién es el que se pone nervioso acá?',
+          `${other}, decí la verdad de una vez. Te va a ir mejor.`
+        ], tip: 'Tu mejor defensa es que el detective dude del otro. Acusá primero y con detalles.' },
+        { title: '7. Si te exigen mostrar la pista inventada', say: [
           `Esa no la vi yo: me la contó ${npc.name}. Pero es cierta.`,
           '¿Otra vez? Ya te mostré una. ¿Y al otro no le pedís nada?',
-          'Se me debe haber mezclado. Lo importante es dónde estaba cada uno.'
-        ], tip: 'Si no hay salida, admití un error chico («me confundí con otra cosa») antes que quedarte en silencio.' }
+          'Se me debe haber mezclado con otra cosa. Lo importante es dónde estaba cada uno.',
+          'Me estás presionando y así cualquiera se confunde.'
+        ], tip: 'Si no hay salida, admití un error chico («me confundí») antes que quedarte en silencio. Y contraatacá enseguida.' },
+        { title: '8. Si te acorralan', say: [
+          'Muy bien. Supongamos que fui yo. ¿Con qué prueba? Porque hasta ahora solo hay palabras.',
+          'Están buscando un culpable fácil. Y yo soy el más fácil.',
+          'Si me acusás y te equivocás, el asesino sale caminando por esa puerta. Pensalo.'
+        ] }
       ];
     }
 
     return [
       intro,
-      { title: '2. Tu coartada', say: [
-        `Estuve en ${placeName(game.sol[0][game.players[ui.role]])} toda la noche. No me moví de ahí.`,
-        `Llevaba ${objName(game.sol[2][game.players[ui.role]])}. Lo puede confirmar cualquiera.`,
-        'Lo que hacía ahí es asunto mío y no tiene nada que ver con el robo.',
-        'Sí, eso que dicen de mí es cierto. Pero una cosa es tener problemas y otra es robar.'
+      aboutVictim,
+      { title: '3. Tu coartada', say: [
+        `A esa hora estaba en ${placeName(game.sol[0][meIdx])}. No me moví de ahí.`,
+        `Tenía ${objName(game.sol[2][meIdx])}. No lo usé contra nadie.`,
+        'Lo que hacía ahí es asunto mío y no tiene nada que ver con el crimen.',
+        'No escuché nada. Ojalá hubiera escuchado.'
       ], tip: `Estabas ${part.doing}. Podés esquivarlo o inventar otra cosa, pero ojo: si te ven dudar, vas a parecer culpable. A veces conviene confesarlo y listo.` },
-      { title: '3. Tu testimonio', say: [
+      aboutMotive,
+      { title: '5. Tu testimonio', say: [
         `Yo vi ${sees}. Anotá bien, porque todo esto es verdad.`,
         'Lo vi con mis propios ojos. Pedime que te lo muestre cuando quieras.',
         'No tengo nada que esconder: usá una orden conmigo.'
       ], tip: 'Contá tus pistas de a una y siempre con las mismas palabras. Todas las tuyas se pueden mostrar en pantalla: esa es tu ventaja.' },
-      { title: '4. Atacar y defenderte', say: [
+      { title: '6. Atacar', say: [
         `${other} miente. Preguntale otra vez dónde estuvo y con qué objeto.`,
         `Pedile a ${other} que te muestre en pantalla lo que acaba de decir. A ver si puede.`,
         `Lo que dice ${other} no puede ser, porque yo vi otra cosa.`,
-        `Y no nos olvidemos de lo que todos saben: «${otherMotive}»`
+        `Y no nos olvidemos de lo que todos saben: «${otherMotive}»`,
+        `${other}, estás hablando con alguien que sabe que fuiste vos.`
       ], tip: `Vos sabés que ${other} es culpable, así que algo de lo que dice es falso. Escuchá su coartada y buscá cuál de tus pistas la contradice: esa es la que tenés que lograr que el detective verifique.` },
-      { title: '5. Antes del veredicto', say: [
-        'Detective, repasá: ¿quién te mostró todo lo que le pediste y quién puso excusas?',
-        `Yo dije lo mismo de principio a fin. ¿${other} también?`
+      { title: '7. Si no te creen', say: [
+        'Estoy diciendo la verdad y me tratan como a un criminal. ¿Así funciona esto?',
+        'Usá la orden conmigo. Ahora. Elegí la pista que quieras.',
+        'Mientras me interrogás a mí, quien lo hizo se está riendo.'
+      ] },
+      { title: '8. Antes del veredicto', say: [
+        'Repasá: ¿quién te mostró todo lo que le pediste y quién puso excusas?',
+        `Yo dije lo mismo de principio a fin. ¿${other} también?`,
+        'Si te equivocás, un asesino queda libre y yo voy preso. Pensalo bien.'
       ] }
     ];
   }
 
   function viewScript() {
-    if (!game.versus) return '';
     const blocks = script().map((b) => `
       <h3>${b.title}</h3>
       ${b.say.map((line) => `<p class="say">«${line}»</p>`).join('')}
       ${b.tip ? `<p class="tip">💡 ${b.tip}</p>` : ''}`).join('');
     return `<details class="card guide script">
       <summary>Tu guion</summary>
-      <p class="muted small">Frases para arrancar cada ronda. Usalas tal cual o como punto de partida, con la voz de tu personaje.</p>
+      <p class="muted small">Frases para arrancar cada ronda. Usalas tal cual o como punto de partida, con la voz y el acento de tu personaje.</p>
       ${blocks}
     </details>`;
   }
@@ -373,47 +473,56 @@
     const part = game.parts[ui.role];
     const info = roleInfo(ui.role);
     const suspect = game.versus && ui.role > 0;
-    let who;
+    const me = suspect ? game.players[ui.role] : null;
+    const who = suspect ? person(me) : part.persona;
+    const title = suspect ? `${who.icon} ${who.name} ${who.last}` : `${info.icon} ${who.name}`;
+    const job = suspect ? who.role : (game.versus ? 'detective a cargo' : 'especialista en ' + info.deck.toLowerCase());
     let secret = '';
     if (suspect) {
-      const me = game.players[ui.role];
-      const p = person(me);
-      who = `<h2>${p.icon} Sos ${p.name}, ${p.role}</h2>`;
       if (isGuilty()) {
-        const s = game.story;
+        const st = game.story;
         secret = `<div class="card verdict bad">
-          <h2>Sos culpable</h2>
-          <p>Te llevaste ${game.loot}. Pasaste la noche en <b>${placeName(game.crimePlace)}</b> y llevabas <b>${objName(game.tool)}</b>.</p>
+          <div class="stamp red">Culpable</div>
+          <h2>Fuiste vos</h2>
+          <p>Mataste a ${game.victim.name}. A la hora del crimen estabas en <b>${placeName(game.crimePlace)}</b> y tenías <b>${objName(game.tool)}</b>.</p>
           <h3>Tu coartada sugerida</h3>
-          <p>Decí que estuviste en <b>${placeName(s.place)}</b>, que llevabas <b>${objName(s.obj)}</b> y que estabas ${part.doing}.</p>
+          <p>Decí que estuviste en <b>${placeName(st.place)}</b>, que tenías <b>${objName(st.obj)}</b> y que estabas ${part.doing}.</p>
           <p class="muted small">Podés mentir en todo e inventar lo que quieras, pero sostené la historia: si te contradecís, te hundís. En <b>Pistas</b> está qué decir y qué podés probar. Tu mejor defensa es que el detective sospeche del otro.</p>
         </div>`;
       } else {
         secret = `<div class="card verdict good">
-          <h2>Sos inocente</h2>
-          <p>Pasaste la noche en <b>${placeName(game.sol[0][me])}</b> y llevabas <b>${objName(game.sol[2][me])}</b>. Estabas ${part.doing}.</p>
-          <p class="muted small">No podés mentir sobre el lugar, el objeto ni lo que viste. Lo que estabas haciendo te da vergüenza: podés esquivar la pregunta o inventar otra cosa. El otro sospechoso es culpable y va a mentir: convencé al detective.</p>
+          <div class="stamp green">Inocente</div>
+          <h2>No fuiste vos</h2>
+          <p>A la hora del crimen estabas en <b>${placeName(game.sol[0][me])}</b> y tenías <b>${objName(game.sol[2][me])}</b>. Estabas ${part.doing}.</p>
+          <p class="muted small">No podés mentir sobre el lugar, el objeto ni lo que viste. Lo que estabas haciendo te compromete: podés esquivar la pregunta o inventar otra cosa. El otro sospechoso es el asesino y va a mentir: convencé al detective.</p>
         </div>`;
       }
-      secret += `<div class="card"><h3 style="margin-top:0">Lo que todos saben de vos</h3><p>${part.motive}</p></div>`;
-    } else {
-      who = `<h2>${info.icon} ${part.persona.name}, ${info.name.toLowerCase()}</h2>`;
-      if (game.versus) {
-        const left = ORDERS - save.orders;
-        secret = `<div class="card">
-          <h3 style="margin-top:0">Tu trabajo</h3>
-          <p>Uno de los dos sospechosos miente. Interrogalos, compará lo que dicen con tu evidencia y acusá a uno. Tenés una sola acusación.</p>
-          <h3>Órdenes de registro: ${left} de ${ORDERS}</h3>
-          <p class="muted small">Con una orden obligás a un sospechoso a mostrarte en pantalla una pista que te dijo. Si la muestra, esa pista es verdadera. Si no puede, la inventó.</p>
-          <button class="btn" data-act="order" ${left ? '' : 'disabled'}>Usar una orden</button>
-        </div>`;
-      }
+      secret += `<div class="card"><h3 style="margin-top:0">Tu móvil, según todos</h3><p>${part.motive}</p></div>`;
+    } else if (game.versus) {
+      const left = ORDERS - save.orders;
+      secret = `<div class="card">
+        <h3 style="margin-top:0">Tu trabajo</h3>
+        <p>Uno de los dos sospechosos mató a ${game.victim.name} y miente. Interrogalos, compará lo que dicen con tu evidencia y acusá a uno. Tenés una sola acusación.</p>
+        <h3>Órdenes de registro: ${left} de ${ORDERS}</h3>
+        <p class="muted small">Con una orden obligás a un sospechoso a mostrarte en pantalla una pista que te dijo. Si la muestra, esa pista es verdadera. Si no puede, la inventó.</p>
+        <button class="btn" data-act="order" ${left ? '' : 'disabled'}>Usar una orden</button>
+      </div>`;
     }
     return `
       <div class="card persona">
-        ${who}
-        <p>${part.persona.style}</p>
-        <p class="tic">Tu muletilla: «${part.persona.tic}»</p>
+        <p class="file-no">Ficha personal</p>
+        <h2>${title}</h2>
+        <table class="facts">
+          <tr><th>Papel</th><td>${E.cap(job)}</td></tr>
+          <tr><th>Origen</th><td>${E.cap(who.origin)}</td></tr>
+          <tr><th>Muletilla</th><td>«${who.tic}»</td></tr>
+        </table>
+        <h3>Cómo hablar</h3>
+        <p>${who.accent}</p>
+        <h3>Carácter</h3>
+        <p>${who.style}</p>
+        <h3>Trasfondo</h3>
+        <p>${who.bg}</p>
       </div>
       ${secret}
       ${viewScript()}
@@ -512,30 +621,30 @@
 
   function viewResult() {
     const guilty = person(game.culprit);
-    const fact = `Fue <b>${guilty.name}</b>, con ${objName(game.tool)}.`;
+    const fact = `Quien mató a ${game.victim.name} fue <b>${guilty.name} ${guilty.last}</b>. Causa de muerte: ${game.cast.objects[game.tool].cause}.`;
     let head;
     let extra = '';
     if (game.versus) {
       if (save.tries) {
         head = save.won
-          ? `<div class="stars">⚖️</div><h2>¡Culpable atrapado!</h2><p>${fact} Ganan el detective y el inocente.</p>`
-          : `<div class="stars">🏃</div><h2>El culpable se salvó</h2><p>Acusaron a un inocente. ${fact}</p>`;
+          ? `<div class="stamp green">Caso cerrado</div><h2>Asesino atrapado</h2><p>${fact} Ganan el detective y el inocente.</p>`
+          : `<div class="stamp red">Error judicial</div><h2>El asesino quedó libre</h2><p>Acusaron a un inocente. ${fact}</p>`;
       } else {
-        head = `<div class="stars">📂</div><h2>Desenlace</h2><p>${fact}</p>`;
+        head = `<div class="stamp red">Desenlace</div><h2>Expediente ${fileNo()}</h2><p>${fact}</p>`;
       }
-      const s = game.story;
-      const fakes = s.hand.filter((h) => !h.real).map((h) => `<li>${E.describe(h.c, game.cast)}</li>`).join('');
-      const keys = s.keys.map((k) => `<li>${E.describe(game.clues[3 - game.guilty][k], game.cast)}</li>`).join('');
+      const st = game.story;
+      const fakes = st.hand.filter((h) => !h.real).map((h) => `<li>${E.describe(h.c, game.cast)}</li>`).join('');
+      const keys = st.keys.map((k) => `<li>${E.describe(game.clues[3 - game.guilty][k], game.cast)}</li>`).join('');
       extra = `<h3>La coartada sugerida</h3>
-        <p class="left">Decir que estuvo en ${placeName(s.place)} con ${objName(s.obj)}.</p>
+        <p class="left">Decir que estuvo en ${placeName(st.place)} con ${objName(st.obj)}.</p>
         ${fakes ? `<p class="left">Pista inventada:</p><ul class="steps left">${fakes}</ul>` : ''}
         ${keys ? `<p class="left">Lo que la desarmaba, si el detective verificaba esta pista del inocente:</p><ul class="steps left">${keys}</ul>` : ''}`;
     } else if (save.won) {
       const stars = save.tries === 1 ? 3 : 2;
-      head = `<div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div><h2>¡Caso resuelto!</h2>
+      head = `<div class="stamp green">Caso cerrado</div><div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
         <p>${fact} Tiempo: ${fmtTime(elapsed())}.</p>`;
     } else {
-      head = `<div class="stars">🕸️</div><h2>${save.tries ? 'El culpable escapó' : 'Desenlace'}</h2><p>${fact}</p>`;
+      head = `<div class="stamp red">${save.tries ? 'Sin resolver' : 'Desenlace'}</div><h2>${save.tries ? 'El asesino escapó' : 'Expediente ' + fileNo()}</h2><p>${fact}</p>`;
     }
     return `
       <div class="card result">${head}${extra}${viewSolution()}</div>
@@ -544,7 +653,7 @@
         <p class="muted small">Cada uno lee la suya en voz alta y cuenta si la cumplió. Los otros dos deciden si vale.</p>
         <p>${game.parts[ui.role].mission} ${save.mission ? '<b>✓</b>' : ''}</p>
       </div>
-      <button class="btn primary" data-act="home">Jugar otro caso</button>`;
+      <button class="btn primary" data-act="home">Abrir otro expediente</button>`;
   }
 
   function viewAcusar() {
@@ -565,7 +674,7 @@
       return `
         <div class="card">
           <h2>Veredicto</h2>
-          <p class="muted small">Tenés <b>una sola</b> acusación. Si señalás al inocente, el culpable se salva y gana.</p>
+          <p class="muted small">Tenés <b>una sola</b> acusación. Si señalás al inocente, el asesino queda libre y gana.</p>
           <h3>¿Quién fue?</h3><div class="chips">${who}</div>
         </div>
         <button class="btn primary" data-act="accuse" ${ui.pickWho === null ? 'disabled' : ''}>Acusar</button>`;
@@ -580,7 +689,7 @@
         <p class="muted small">Decidan entre los tres antes de acusar. ${left === 1 ? 'Queda <b>1</b> intento.' : `Quedan <b>${left}</b> intentos.`}
         Carga la acusación una sola persona.</p>
         <h3>¿Quién fue?</h3><div class="chips">${who}</div>
-        <h3>¿Qué objeto llevaba?</h3><div class="chips">${what}</div>
+        <h3>¿Con qué arma?</h3><div class="chips">${what}</div>
       </div>
       <button class="btn primary" data-act="accuse" ${ui.pickWho === null || ui.pickWhat === null ? 'disabled' : ''}>Acusar</button>
       ${reveal}`;
@@ -590,7 +699,7 @@
     const info = roleInfo(ui.role);
     return `<div class="overlay" data-act="closeProof">
       <div class="proof">
-        <div class="stamp">Prueba auténtica</div>
+        <div class="stamp green">Prueba auténtica</div>
         <p class="text">${ui.proof}</p>
         <p class="muted small">Caso ${ui.code} · declaración de ${info.name}</p>
         <button class="btn" data-act="closeProof">Cerrar</button>
