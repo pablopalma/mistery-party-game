@@ -45,9 +45,54 @@
   // Tipos de pista: 0 = persona-lugar, 1 = lugar-objeto, 2 = persona-objeto.
   // Cada rol recibe un solo tipo, por eso nadie puede resolver sola.
   const ROLES = [
-    { id: 0, name: 'Detective', icon: '🕵️', deck: 'Coartadas', about: 'Sabés quién estuvo (o no) en cada lugar.' },
-    { id: 1, name: 'Forense', icon: '🔬', deck: 'Rastros', about: 'Sabés qué objeto pasó por cada lugar.' },
-    { id: 2, name: 'Periodista', icon: '📰', deck: 'Testimonios', about: 'Sabés quién llevaba (o no) cada objeto.' }
+    { id: 0, name: 'Detective', icon: '🕵️', deck: 'Coartadas', about: 'Sabés quién estuvo (o no) en cada lugar.', saw: 'Viste quién entró y quién no a cada lugar.' },
+    { id: 1, name: 'Forense', icon: '🔬', deck: 'Rastros', about: 'Sabés qué objeto pasó por cada lugar.', saw: 'Viste qué objeto había en cada lugar.' },
+    { id: 2, name: 'Periodista', icon: '📰', deck: 'Testimonios', about: 'Sabés quién llevaba (o no) cada objeto.', saw: 'Viste qué objeto llevaba cada persona.' }
+  ];
+
+  // Personajes para interpretar: se reparten al azar, uno por rol.
+  const PERSONAS = [
+    { name: 'Inspector Bermúdez', style: 'Desconfía de todo el mundo, habla seco y cortante. Jamás sonríe.', tic: 'Eso no me cierra.' },
+    { name: 'Tía Pilar', style: 'Habla sin parar y se va por las ramas. Todo le recuerda a un pariente.', tic: 'Como decía mi primo…' },
+    { name: 'Profe Lux', style: 'Usa palabras rebuscadas y corrige a todo el mundo, aunque nadie se lo pida.', tic: 'Técnicamente…' },
+    { name: 'Vidente Zoraida', style: 'Confía más en sus presentimientos que en las pruebas. Mira fijo antes de hablar.', tic: 'Lo presentía.' },
+    { name: 'Sargento Rocha', style: 'Habla fuerte, da órdenes y exige respuestas cortas.', tic: '¡Al grano!' },
+    { name: 'Miel Dulzura', style: 'Exageradamente amable: elogia a cada persona justo antes de sospechar de ella.', tic: 'Con todo cariño…' },
+    { name: 'Agente Sombra', style: 'Susurra, mira hacia los costados y habla de sí en tercera persona.', tic: 'Sombra ya lo sabía.' },
+    { name: 'Su Excelencia Altamira', style: 'De la alta sociedad: todo le parece vulgar y se ofende con facilidad.', tic: '¡Qué ordinariez!' },
+    { name: 'Reloj Ruiz', style: 'Siempre con apuro. Mira la hora a cada rato y resopla.', tic: 'No tengo toda la noche.' }
+  ];
+  const MISSIONS = [
+    'Lográ que alguien diga la palabra «imposible».',
+    'Acusá a alguien de pie y señalando con el dedo, al menos una vez.',
+    'Hacé que otra persona repita la misma pista tres veces.',
+    'Decí «¡objeción!» y conseguí que te respondan en serio.',
+    'Conseguí que alguien te pida disculpas.',
+    'Usá tu muletilla cinco veces sin que nadie lo comente.',
+    'Hacé una pausa dramática de cinco segundos antes de leer una pista.',
+    'Convencé al grupo de votar algo, lo que sea, a mano alzada.',
+    'Lográ que alguien te dé la razón diciendo «tenés razón».'
+  ];
+
+  // Para los sospechosos: un motivo que todos conocen y algo vergonzoso que estaban haciendo.
+  const MOTIVES = [
+    'Debe mucho dinero y lo sabe todo el pueblo.',
+    'Discutió a los gritos con la familia la semana pasada.',
+    'Siempre dijo que eso le correspondía por herencia.',
+    'Le avisaron que este mes se queda sin trabajo.',
+    'Alguien lo vio rondando la casa de madrugada hace unos días.',
+    'Necesita plata urgente para irse de viaje.',
+    'Juró en público que se iba a vengar de la familia.'
+  ];
+  const DOINGS = [
+    'comiéndote a escondidas el postre de la fiesta',
+    'ensayando un baile ridículo para grabar un video',
+    'llorando con una telenovela',
+    'escribiendo una carta de amor',
+    'durmiendo una siesta en horario de trabajo',
+    'practicando un discurso frente al espejo',
+    'probándote ropa ajena',
+    'buscando señal para chusmear el celular'
   ];
 
   const LEVELS = {
@@ -274,32 +319,132 @@
     }
 
     return {
-      n, cast, loot, crimePlace, culprit, quality,
+      n, cast, loot, crimePlace, culprit, quality, sol,
+      kinds: cfg.kinds,
       tool: lo[crimePlace],
       solution: { place, obj: sol[2] },
       clues: byRole.map((list) => shuffle(list, rng))
     };
   }
 
-  function parseCode(raw) {
-    const m = /^([FMD])-?(\d{4})$/.exec(String(raw || '').trim().toUpperCase());
-    return m ? m[1] + '-' + m[2] : null;
+  function sameClue(a, b) {
+    return a.t === b.t && a.k === b.k && a.x === b.x && a.y === b.y && a.x2 === b.x2 && a.y2 === b.y2;
   }
 
-  function newCode(level) {
-    return level + '-' + String(1000 + Math.floor(Math.random() * 9000));
+  // Modo culpable: 1 detective (rol 0) y 2 sospechosos (roles 1 y 2), uno inocente y uno culpable.
+  // Al culpable se le sugiere una historia alterna: un mundo falso donde estuvo en otro lado.
+  // Esa historia no choca con la evidencia del detective, así que él no puede desmentirla solo;
+  // pero hay una o dos pistas del inocente que, si el detective las verifica, la vuelven imposible.
+  function buildStory(game, rng) {
+    const states = allStates(game.n);
+    const sol = game.sol;
+    const cp = game.crimePlace;
+    const g = game.guilty;
+    const f = 3 - g;
+    const C = game.players[g];
+    const F = game.players[f];
+    const evidence = game.clues[0];
+    const witness = game.clues[f];
+    const real = game.clues[g];
+    const kinds = game.kinds.filter((k) => k !== 'pos');
+    const options = [];
+    for (const st of states) {
+      if (st[0][F] !== cp) continue;
+      if (st[0][C] === sol[0][F] || st[2][C] === sol[2][F]) continue;
+      if (!evidence.every((c) => holds(c, st))) continue;
+      // Lo ideal es exactamente una pista falsa: da juego a las órdenes de registro sin delatarse.
+      const lies = real.filter((c) => !holds(c, st)).length;
+      options.push({ st, off: Math.abs(lies - 1), tie: rng() });
+    }
+    options.sort((a, b) => a.off - b.off || a.tie - b.tie);
+
+    let fallback = null;
+    for (const o of options.slice(0, 80)) {
+      const pool = candidates(o.st, game.n, kinds, rng).filter((c) => c.t === g && !holds(c, sol));
+      const hand = [];
+      for (const c of real) {
+        if (holds(c, o.st)) {
+          hand.push({ c, real: true });
+          continue;
+        }
+        const free = pool.filter((p) => !hand.some((h) => sameClue(h.c, p)));
+        const fake = free.find((p) => p.k === c.k) || free[0];
+        if (fake) hand.push({ c: fake, real: false });
+      }
+      const place = o.st[0][C];
+      const obj = o.st[2][C];
+      // Mundos en los que el culpable dice la verdad: el otro sospechoso estuvo en el lugar del hecho.
+      const worlds = states.filter((st) =>
+        st[0][F] === cp && st[0][C] === place && st[2][C] === obj &&
+        evidence.every((c) => holds(c, st)) && hand.every((h) => holds(h.c, st)));
+      let keys = [];
+      witness.forEach((x, i) => {
+        if (!keys.length && !worlds.some((st) => holds(x, st))) keys = [i];
+      });
+      for (let i = 0; i < witness.length && !keys.length; i++) {
+        for (let k = i + 1; k < witness.length && !keys.length; k++) {
+          if (!worlds.some((st) => holds(witness[i], st) && holds(witness[k], st))) keys = [i, k];
+        }
+      }
+      const story = { place, obj, hand, keys };
+      if (keys.length) return story;
+      fallback = fallback || story;
+    }
+    return fallback;
+  }
+
+  // Personajes y misiones para todos; sospechosos, culpable y coartada solo en el modo culpable.
+  function addExtras(game, rng, versus) {
+    const personas = shuffle(PERSONAS, rng);
+    const missions = shuffle(MISSIONS, rng);
+    game.parts = [0, 1, 2].map((i) => ({ persona: personas[i], mission: missions[i] }));
+    game.versus = false;
+    if (!versus) return;
+
+    // Sospechosos: el culpable y otra persona a la que la evidencia del detective no descarte sola.
+    const motives = shuffle(MOTIVES, rng);
+    const doings = shuffle(DOINGS, rng);
+    for (const other of shuffle(range(game.n).filter((p) => p !== game.culprit), rng)) {
+      const pair = shuffle([game.culprit, other], rng);
+      game.players = [null, pair[0], pair[1]];
+      game.guilty = game.players.indexOf(game.culprit);
+      game.story = buildStory(game, rng);
+      if (game.story && game.story.keys.length) break;
+    }
+    [1, 2].forEach((r) => {
+      game.parts[r].motive = motives[r];
+      game.parts[r].doing = doings[r];
+    });
+    game.versus = !!game.story;
+  }
+
+  function parseCode(raw) {
+    const m = /^([FMD])(C?)-?(\d{4})$/.exec(String(raw || '').toUpperCase().replace(/\s+/g, ''));
+    return m ? m[1] + m[2] + '-' + m[3] : null;
+  }
+
+  function newCode(level, versus) {
+    return level + (versus ? 'C' : '') + '-' + String(1000 + Math.floor(Math.random() * 9000));
   }
 
   function generate(rawCode) {
     const code = parseCode(rawCode);
     if (!code) return null;
     const cfg = LEVELS[code[0]];
+    const versus = code[1] === 'C';
+    // Se prueban semillas derivadas del código hasta dar con un caso bien formado:
+    // que hagan falta los tres roles y, en modo culpable, que la coartada tenga punto débil.
     let best = null;
     for (let attempt = 0; attempt < 60; attempt++) {
       const game = build(mulberry32(hashStr(code + '#' + attempt)), cfg);
       if (!game) continue;
-      if (!best || game.quality > best.quality) best = game;
-      if (best.quality === 2) break;
+      addExtras(game, mulberry32(hashStr(code + '#extras' + attempt)), versus);
+      const score = game.quality + (versus && game.versus ? 3 + (game.story.keys.length ? 3 : 0) : 0);
+      if (!best || score > best.score) {
+        best = game;
+        best.score = score;
+      }
+      if (score === (versus ? 8 : 2)) break;
     }
     best.code = code;
     best.level = cfg.label;

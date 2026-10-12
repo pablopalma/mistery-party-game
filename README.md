@@ -1,32 +1,43 @@
 # Tres Sabuesos 🔎
 
-Juego cooperativo de misterio para exactamente 3 personas. Cada una entra al mismo caso desde su celular y recibe pistas que las otras no ven; solo hablando entre las tres se puede deducir quién fue.
+Juego de misterio, deducción y un poco de teatro para exactamente 3 personas. Cada una entra al mismo caso desde su celular y ve información que las otras no.
 
-## Cómo se juega
+## Modos
 
-1. Una crea un caso (Fácil, Medio o Difícil) y comparte el código o el enlace.
-2. Cada una elige un rol distinto:
-   - 🕵️ **Detective**: sabe quién estuvo en cada lugar.
-   - 🔬 **Forense**: sabe qué objeto pasó por cada lugar.
-   - 📰 **Periodista**: sabe quién llevaba cada objeto.
-3. Prohibido mostrar la pantalla: las pistas se dicen en voz alta.
-4. Entre las tres deducen al culpable y el objeto que llevaba. Hay 2 acusaciones.
+### 🎭 Culpable entre nosotros (códigos como `MC-4821`)
 
-Con un solo celular también funciona: se pasa de mano en mano con "Cambiar rol".
+Un detective y dos sospechosos. Uno de los sospechosos es inocente y el otro culpable; cada uno se entera al entrar.
+
+- **Detective**: tiene evidencia propia, interroga y dispone de 2 órdenes de registro. Con una orden obliga a un sospechoso a mostrar en pantalla una pista que le dijo: si la muestra, es verdadera; si no puede, la inventó. Tiene una sola acusación.
+- **Inocente**: no puede mentir sobre dónde estuvo, qué llevaba ni qué vio. Tiene que convencer al detective.
+- **Culpable**: recibe una coartada sugerida (dónde decir que estuvo y qué pista inventar) y puede mentir en todo.
+
+Si el detective acierta, gana con el inocente. Si acusa al inocente, gana el culpable.
+
+La coartada no choca con la evidencia del detective, así que no se cae sola. Pero siempre hay una o dos pistas del inocente que, una vez verificadas, la vuelven imposible.
+
+### 🤝 En equipo (códigos como `M-4821`)
+
+Los tres investigan juntos. Detective, Forense y Periodista tienen pistas distintas y ningún par puede resolver el caso sin el tercero. Hay 2 acusaciones.
+
+## En los dos modos
+
+- Cada jugador recibe un **personaje** con forma de hablar y muletilla, y una **misión secreta** para actuar.
+- La pestaña **Caso** trae una guía ronda por ronda.
+- Prohibido mostrar la pantalla, salvo cuando el juego lo pide.
+- Con un solo celular también funciona: se pasa de mano en mano con «Cambiar papel».
 
 ## Cómo funciona
 
-No hay servidor. El código del caso es la semilla de un generador determinista, así que los tres dispositivos arman exactamente el mismo misterio. Cada caso tiene solución única y está verificado para que ningún par de roles pueda resolverlo sin el tercero.
+No hay servidor. El código del caso es la semilla de un generador determinista, así que los tres dispositivos arman exactamente el mismo misterio.
 
-- `engine.js`: generador de casos y textos de las pistas.
+- `engine.js`: generador de casos, coartadas y textos de las pistas.
 - `app.js`: pantallas, notas y acusación (el progreso se guarda en `localStorage`).
 - `style.css`, `index.html`: interfaz.
 
 ## Publicar en GitHub Pages
 
-1. Subir estos archivos a un repositorio público de GitHub.
-2. En el repositorio: **Settings → Pages → Source: Deploy from a branch**, rama `main`, carpeta `/ (root)`.
-3. En un minuto queda en `https://USUARIO.github.io/REPOSITORIO/`.
+En el repositorio: **Settings → Pages → Source: Deploy from a branch**, rama `main`, carpeta `/ (root)`.
 
 ## Probar en local
 
